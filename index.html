@@ -117,6 +117,9 @@
                         <label for="api-key">Gemini API 키</label>
                         <input type="text" id="api-key" placeholder="API 키를 입력하세요">
 
+                        <label for="system-prompt">System Prompt (AI 행동 규칙)</label>
+                        <textarea id="system-prompt" placeholder="AI의 말투, 역할, 응답 형식 등 구체적인 규칙을 지시하세요. (예: 넌 이제부터 고양이야. '야옹'으로만 대답해.)"></textarea>
+
                         <label for="user-persona">User Persona</label>
                         <textarea id="user-persona" placeholder="캐릭터가 나를 어떻게 인식할지 알려주세요."></textarea>
 
@@ -142,7 +145,17 @@
 
         </div>
     </div>
-
+    <div id="edit-modal" class="modal-overlay">
+    <div class="modal-content">
+        <h3>메시지 편집</h3>
+        <textarea id="modal-textarea"></textarea>
+        <div class="modal-buttons">
+            <button id="modal-cancel-btn">취소</button>
+            <button id="modal-delete-btn" class="danger">삭제</button>
+            <button id="modal-save-btn">저장</button>
+        </div>
+    </div>
+    </div>
     <!-- JavaScript 파일 연결 (defer: HTML 로딩이 끝난 후 스크립트를 실행) -->
     <script defer src="script.js"></script>
 </body>
