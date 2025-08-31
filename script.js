@@ -2,10 +2,26 @@
 document.addEventListener('DOMContentLoaded', () => {
 
     // --- 1. 필요한 HTML 요소들 가져오기 ---
+    // 화면 전환 관련 요소
     const appIcons = document.querySelectorAll('.app-icon');
     const appViews = document.querySelectorAll('.app-view');
     const backButtons = document.querySelectorAll('.back-btn');
     const homeScreen = document.getElementById('home-screen');
+
+    // 설정 앱 관련 요소
+    const apiKeyInput = document.getElementById('api-key');
+    const userPersonaInput = document.getElementById('user-persona');
+    const userNoteInput = document.getElementById('user-note');
+    const jsonUploadInput = document.getElementById('json-upload');
+    const saveSettingsBtn = document.getElementById('save-settings-btn');
+
+    // 채팅 관련 요소
+    const messageInput = document.getElementById('message-input');
+    const sendBtn = document.getElementById('send-btn');
+    
+    // 데이터를 저장할 변수
+    let chatLogData = null; // 업로드된 JSON 데이터가 저장될 곳
+
 
     // --- 2. 핵심 기능 함수 ---
 
@@ -14,12 +30,7 @@ document.addEventListener('DOMContentLoaded', () => {
      * @param {string} appId - 보여줄 앱의 ID (html의 data-app 속성값)
      */
     function openApp(appId) {
-        // 홈 화면을 포함한 모든 앱 화면을 일단 숨김 처리
-        appViews.forEach(view => {
-            view.classList.remove('active');
-        });
-        
-        // 클릭한 아이콘에 해당하는 앱 화면을 찾아서 'active' 클래스를 추가해 보여줌
+        appViews.forEach(view => view.classList.remove('active'));
         const targetApp = document.querySelector(`.app-view[data-app-id="${appId}"]`);
         if (targetApp) {
             targetApp.classList.add('active');
@@ -30,49 +41,125 @@ document.addEventListener('DOMContentLoaded', () => {
      * 홈 화면으로 돌아가는 함수
      */
     function goHome() {
-        // 모든 앱 화면을 숨김 처리
-        appViews.forEach(view => {
-            view.classList.remove('active');
-        });
-        
-        // 홈 화면에 'active' 클래스를 추가해 보여줌
+        appViews.forEach(view => view.classList.remove('active'));
         homeScreen.classList.add('active');
+    }
+
+    /**
+     * 설정 값을 브라우저의 로컬 스토리지에 저장하는 함수
+     */
+    function saveSettings() {
+        // localStorage는 브라우저에 데이터를 문자열 형태로 저장하는 작은 저장소입니다.
+        localStorage.setItem('geminiApiKey', apiKeyInput.value);
+        localStorage.setItem('userPersona', userPersonaInput.value);
+        localStorage.setItem('userNote', userNoteInput.value);
+
+        alert('설정이 저장되었습니다!'); // 사용자에게 저장되었음을 알림
+    }
+
+    /**
+     * 로컬 스토리지에서 설정 값을 불러와 입력창에 채워주는 함수
+     */
+    function loadSettings() {
+        apiKeyInput.value = localStorage.getItem('geminiApiKey') || '';
+        userPersonaInput.value = localStorage.getItem('userPersona') || '';
+        userNoteInput.value = localStorage.getItem('userNote') || '';
+    }
+
+    /**
+     * 사용자가 업로드한 JSON 파일을 읽어서 변수에 저장하는 함수
+     * @param {Event} event - 파일 입력(input) 이벤트 객체
+     */
+    function handleFileUpload(event) {
+        const file = event.target.files[0]; // 사용자가 선택한 파일
+        if (!file) {
+            return; // 파일이 선택되지 않았으면 함수 종료
+        }
+
+        const reader = new FileReader(); // 파일을 읽기 위한 객체 생성
+
+        // 파일 읽기가 완료되었을 때 실행될 함수 설정
+        reader.onload = (e) => {
+            try {
+                // 읽어온 파일 내용(문자열)을 JSON 객체로 변환
+                chatLogData = JSON.parse(e.target.result);
+                console.log('JSON 파일 로딩 및 파싱 성공:', chatLogData);
+                alert(`${file.name} 파일이 성공적으로 주입되었습니다.`);
+                
+                // TODO: 다음 단계에서 이 함수를 호출할 예정
+                // classifyAndDisplayLogs(); 
+            } catch (error) {
+                console.error('JSON 파싱 오류:', error);
+                alert('올바른 JSON 파일이 아닙니다.');
+            }
+        };
+
+        // 파일을 텍스트 형식으로 읽기 시작
+        reader.readAsText(file);
     }
 
 
     // --- 3. 이벤트 리스너(Event Listeners) 설정 ---
 
-    // 각 앱 아이콘에 클릭 이벤트 추가
+    // 앱 아이콘 클릭 이벤트
     appIcons.forEach(icon => {
         icon.addEventListener('click', () => {
-            // 아이콘이 가지고 있는 data-app 속성값을 가져옴
-            const appId = icon.dataset.app; 
+            const appId = icon.dataset.app;
             openApp(appId);
         });
     });
 
-    // 각 '홈' 버튼에 클릭 이벤트 추가
+    // '홈' 버튼 클릭 이벤트
     backButtons.forEach(button => {
         button.addEventListener('click', goHome);
     });
 
+    // 설정 저장 버튼 클릭 이벤트
+    saveSettingsBtn.addEventListener('click', saveSettings);
 
-    // --- 4. 앞으로 구현될 기능들을 위한 준비 공간 ---
+    // JSON 파일 업로드 이벤트
+    jsonUploadInput.addEventListener('change', handleFileUpload);
 
-    // TODO: (1) 시작 시 JSON 파일 로딩 및 AI 분류 기능 실행
-    //   - 사용자가 설정에서 JSON 파일을 업로드하면, 이 파일을 읽어옵니다.
-    //   - 읽어온 데이터를 기반으로 Gemini API에 "이 대화는 전화/문자/카톡 중 뭐야?"라고 물어봅니다.
-    //   - API의 답변에 따라 데이터를 각 앱의 목록에 맞게 재정렬합니다.
-    //   - 재정렬된 데이터를 화면에 표시합니다. (예: 전화 앱 목록 업데이트)
 
-    // TODO: (2) 설정 저장 및 불러오기 기능
-    //   - '저장하기' 버튼을 누르면 API 키 등의 정보를 브라우저의 '로컬 스토리지'에 저장합니다.
-    //   - 페이지가 로드될 때 로컬 스토리지에서 저장된 값을 불러와 입력창에 미리 채워줍니다.
+    // --- 4. 초기화 실행 ---
 
-    // TODO: (3) 캐릭터톡 채팅 기능 구현
-    //   - '전송' 버튼을 누르거나 엔터 키를 입력했을 때의 동작을 정의합니다.
-    //   - 사용자의 메시지를 화면에 표시합니다.
-    //   - 대화 기록, 프롬프트, 새 메시지를 조합하여 Gemini API에 요청을 보냅니다.
-    //   - API로부터 받은 답변을 캐릭터의 말풍선으로 화면에 표시합니다.
+    // 페이지가 처음 로드될 때, 저장된 설정 값을 불러옴
+    loadSettings();
+
+
+    // --- 5. 앞으로 구현될 기능들 ---
+
+    /**
+     * TODO: (다음 단계) JSON 데이터를 AI로 분류하고 화면에 표시하는 함수
+     */
+    function classifyAndDisplayLogs() {
+        if (!chatLogData) {
+            alert('먼저 JSON 파일을 주입해주세요.');
+            return;
+        }
+        
+        const apiKey = apiKeyInput.value;
+        if (!apiKey) {
+            alert('설정에서 Gemini API 키를 먼저 입력해주세요.');
+            return;
+        }
+
+        console.log("AI 분류를 시작합니다...");
+        // 1. chatLogData.conversations 배열을 순회
+        // 2. 각 대화(conversation)마다 Gemini API에 분류 요청 (프롬프트와 함께)
+        // 3. API 응답(전화/문자/카톡)에 따라 데이터를 각각의 배열에 저장
+        // 4. 저장된 데이터를 기반으로 HTML 요소를 동적으로 생성
+        // 5. 생성된 요소를 각 앱의 콘텐츠 영역에 추가 (예: #call-log-list)
+    }
+
+    /**
+     * TODO: (마지막 단계) 캐릭터톡 채팅 기능 구현
+     */
+    function sendChatMessage() {
+        console.log("채팅 메시지 전송 로직 구현...");
+        // 1. 사용자가 입력한 메시지 가져오기
+        // 2. 대화 기록, 프롬프트, 새 메시지를 조합하여 Gemini API에 대화 생성 요청
+        // 3. 응답 받은 후, 나와 캐릭터의 메시지를 채팅창에 추가
+    }
 
 });
