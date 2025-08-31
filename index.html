@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>캐릭터톡</title>
+    <style>
+        /* 기본 스타일 초기화 */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            height: 100%;
+            font-family: -apple-system, BlinkMacSystemFont, 'Malgun Gothic', '맑은 고딕', sans-serif;
+            background-color: #f0f0f0; /* 전체 페이지 배경 */
+        }
+
+        /* 스마트폰 모양의 전체 래퍼 */
+        #app-container {
+            width: 100%;
+            max-width: 480px; /* 스마트폰 최대 너비 */
+            height: 100%;
+            margin: 0 auto;
+            background-color: #A9C4DA; /* 카톡 배경색과 유사하게 */
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1); /* 그림자 효과 */
+            position: relative;
+            overflow: hidden; /* 내부 요소가 벗어나지 않도록 */
+        }
+
+        /* --- 헤더 --- */
+        header.chat-header {
+            background-color: #F9F9F9;
+            padding: 15px;
+            display: flex;
+            align-items: center;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .character-name {
+            font-size: 1.1em;
+            font-weight: bold;
+            flex-grow: 1; /* 이름이 남는 공간을 모두 차지하도록 */
+            text-align: center;
+            padding-right: 40px; /* 설정 아이콘 공간 확보 */
+        }
+
+        #settings-btn {
+            font-size: 1.5em;
+            cursor: pointer;
+            position: absolute;
+            right: 15px;
+            color: #555;
+        }
+
+        /* --- 채팅 로그 영역 --- */
+        main.chat-log {
+            flex-grow: 1; /* 헤더와 입력창을 제외한 모든 공간 차지 */
+            overflow-y: auto; /* 내용이 많아지면 스크롤 */
+            padding: 20px 10px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chat-bubble {
+            max-width: 70%;
+            padding: 10px 15px;
+            border-radius: 18px;
+            margin-bottom: 10px;
+            line-height: 1.5;
+            word-wrap: break-word; /* 긴 단어가 영역을 벗어나지 않도록 */
+        }
+
+        .character {
+            background-color: #FFFFFF;
+            align-self: flex-start; /* 왼쪽 정렬 */
+            border-top-left-radius: 4px;
+        }
+
+        .user {
+            background-color: #FEE500; /* 카카오톡 노란색 */
+            align-self: flex-end; /* 오른쪽 정렬 */
+            border-top-right-radius: 4px;
+        }
+
+        /* --- 메시지 입력창 --- */
+        footer.chat-input {
+            background-color: #F9F9F9;
+            padding: 8px;
+            display: flex;
+            align-items: center;
+            border-top: 1px solid #e0e0e0;
+        }
+
+        #message-input {
+            flex-grow: 1;
+            border: none;
+            padding: 12px;
+            font-size: 1em;
+            background-color: #FFFFFF;
+            border-radius: 20px;
+            margin-right: 8px;
+            outline: none; /* 클릭 시 테두리 제거 */
+        }
+
+        #send-btn {
+            background-color: #FEE500;
+            color: #3C1E1E;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        #send-btn:disabled {
+            background-color: #F2F2F2;
+            cursor: not-allowed;
+        }
+
+        /* --- 설정 메뉴 (초기에는 숨김) --- */
+        #settings-modal {
+            display: none; /* <<<<<<< 기본적으로 보이지 않게 설정 */
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5); /* 반투명 배경 */
+            z-index: 100; /* 다른 요소들 위에 표시 */
+            justify-content: center;
+            align-items: center;
+        }
+
+        .settings-content {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            width: 90%;
+            max-width: 400px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+
+        .settings-content h2 {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .settings-content label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .settings-content input,
+        .settings-content textarea {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 15px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 1em;
+        }
+        
+        .settings-content textarea {
+            resize: vertical; /* 세로 크기만 조절 가능 */
+            min-height: 80px;
+        }
+
+        .settings-buttons {
+            text-align: right;
+        }
+
+        .settings-buttons button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        
+        #save-settings-btn {
+            background-color: #4CAF50; /* 저장 버튼 색상 */
+            color: white;
+            margin-left: 10px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 전체 앱 컨테이너 -->
+    <div id="app-container">
+
+        <!-- 채팅방 헤더 -->
+        <header class="chat-header">
+            <h1 class="character-name">캐릭터 이름</h1>
+            <span id="settings-btn">⚙️</span>
+        </header>
+
+        <!-- 대화 내용이 표시될 영역 -->
+        <main class="chat-log">
+            <div class="chat-bubble character">안녕! 만나서 반가워.</div>
+            <div class="chat-bubble user">나도 반가워! 오늘 날씨 좋다.</div>
+            <div class="chat-bubble character">응, 정말 좋은 것 같아. 어디 산책이라도 갈까?</div>
+            <div class="chat-bubble user">좋아! 어디로 갈까?</div>
+            <div class="chat-bubble character">이건 JSON 파일에서 불러온 대화 로그를 기반으로 화면에 표시될 거야.</div>
+            <div class="chat-bubble user">그리고 내가 새로 입력하는 내용도 이렇게 보이게 되겠지!</div>
+        </main>
+
+        <!-- 메시지 입력 폼 -->
+        <footer class="chat-input">
+            <input type="text" id="message-input" placeholder="메시지 입력...">
+            <button id="send-btn">전송</button>
+        </footer>
+
+        <!-- 설정 메뉴 (모달) -->
+        <div id="settings-modal">
+            <div class="settings-content">
+                <h2>설정</h2>
+                <label for="api-key">Gemini API 키</label>
+                <input type="password" id="api-key" placeholder="API 키를 입력하세요">
+
+                <label for="user-persona">User Persona</label>
+                <textarea id="user-persona" placeholder="캐릭터가 나를 어떻게 인식할지 알려주세요. (예: 나의 오랜 친구)"></textarea>
+
+                <label for="user-note">User Note</label>
+                <textarea id="user-note" placeholder="대화에 참고할 만한 추가 정보를 입력하세요. (예: 지금 우리는 카페에 있다)"></textarea>
+
+                <div class="settings-buttons">
+                    <button id="close-settings-btn">닫기</button>
+                    <button id="save-settings-btn">저장</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+</body>
+</html>
