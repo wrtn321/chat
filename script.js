@@ -8,6 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const apiKeyInput = document.getElementById('api-key');
     const userPersonaInput = document.getElementById('user-persona');
     const userNoteInput = document.getElementById('user-note');
+    const systemPromptInput = document.getElementById('system-prompt'); // 시스템 프롬프트
     const geminiModelInput = document.getElementById('gemini-model');
     const contextSizeInput = document.getElementById('context-size');
     const jsonUploadInput = document.getElementById('json-upload');
@@ -18,8 +19,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const messageInput = document.getElementById('message-input');
     const sendBtn = document.getElementById('send-btn');
     
-    let fullChatHistory = []; // 전체 대화 기록을 저장하는 배열
-    let isGenerating = false; // AI가 응답을 생성 중인지 확인하는 플래그
+    // 수정/삭제 모달 요소
+    const editModal = document.getElementById('edit-modal');
+    const modalTextarea = document.getElementById('modal-textarea');
+    const modalSaveBtn = document.getElementById('modal-save-btn');
+    const modalDeleteBtn = document.getElementById('modal-delete-btn');
+    const modalCancelBtn = document.getElementById('modal-cancel-btn');
+
+    let fullChatHistory = [];
+    let isGenerating = false;
+    let currentlyEditingIndex = -1; // 현재 수정/삭제 중인 메시지의 인덱스
 
     // 2. 핵심 기능 함수 (화면 전환, 설정)
     function openApp(appId) {
@@ -35,18 +44,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function saveSettings() {
         localStorage.setItem('geminiApiKey', apiKeyInput.value);
-        localStorage.setItem('geminiModel', geminiModelInput.value);
         localStorage.setItem('userPersona', userPersonaInput.value);
         localStorage.setItem('userNote', userNoteInput.value);
+        localStorage.setItem('systemPrompt', systemPromptInput.value);
+        localStorage.setItem('geminiModel', geminiModelInput.value);
         localStorage.setItem('contextSize', contextSizeInput.value);
         alert('설정이 저장되었습니다!');
     }
 
     function loadSettings() {
         apiKeyInput.value = localStorage.getItem('geminiApiKey') || '';
-        geminiModelInput.value = localStorage.getItem('geminiModel') || 'gemini-1.5-flash-latest';
         userPersonaInput.value = localStorage.getItem('userPersona') || '';
         userNoteInput.value = localStorage.getItem('userNote') || '';
+        systemPromptInput.value = localStorage.getItem('systemPrompt') || '실제 카톡을 하듯이 짧고 간결한 단문 중심으로 대답해주세요.';
+        geminiModelInput.value = localStorage.getItem('geminiModel') || 'gemini-1.5-flash-latest';
         contextSizeInput.value = localStorage.getItem('contextSize') || '20';
     }
 
@@ -64,7 +75,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 alert(`${data.characterName || '캐릭터'}의 로그가 성공적으로 주입되었습니다.`);
             } catch (error) {
                 alert('올바른 JSON 파일이 아닙니다.');
-                console.error("JSON 파싱 오류:", error);
             }
         };
         reader.readAsText(file);
@@ -76,16 +86,26 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 const data = JSON.parse(savedJSONString);
                 processAndDisplayChat(data);
-                console.log('로컬 스토리지에서 채팅 로그를 불러왔습니다.');
             } catch (error) {
                 console.error('로컬 스토리지 JSON 파싱 오류:', error);
             }
         }
     }
+    
+    /**
+     * 로컬 스토리지에 현재 채팅 기록을 덮어쓰는 함수
+     */
+    function updateStoredChatLog() {
+        // 현재 fullChatHistory를 기반으로 새로운 JSON 객체를 만들어 저장
+        const currentData = JSON.parse(localStorage.getItem('chatLogJSON') || '{}');
+        currentData.messages = fullChatHistory;
+        localStorage.setItem('chatLogJSON', JSON.stringify(currentData));
+    }
+
 
     function processAndDisplayChat(data) {
         characterNameHeader.textContent = data.characterName || '캐릭터';
-        if(data.userPersona && data.userPersona.information && !userPersonaInput.value) {
+        if (data.userPersona && data.userPersona.information && !localStorage.getItem('userPersona')) {
             userPersonaInput.value = data.userPersona.information;
         }
         if (data.messages && Array.isArray(data.messages)) {
@@ -96,14 +116,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function displayChatHistory() {
         chatLogContainer.innerHTML = '';
-        fullChatHistory.forEach(message => appendBubble(message.content, message.role));
+        fullChatHistory.forEach((message, index) => {
+            appendBubble(message.content, message.role, index);
+        });
         scrollToBottom();
     }
 
-    function appendBubble(text, role) {
+    function appendBubble(text, role, index) {
         const bubble = document.createElement('div');
         bubble.classList.add('chat-bubble');
         bubble.textContent = text;
+        bubble.dataset.index = index; // 각 말풍선에 고유 인덱스 부여
         if (role === 'user') {
             bubble.classList.add('user');
         } else {
@@ -116,111 +139,143 @@ document.addEventListener('DOMContentLoaded', () => {
         chatLogContainer.scrollTop = chatLogContainer.scrollHeight;
     }
     
-    // --- 4. 채팅 메시지 전송 및 AI 응답 처리 (이번 단계의 핵심) ---
-
-    /**
-     * 사용자가 메시지를 보내면 AI에게 응답을 요청하고 화면에 표시하는 메인 함수
-     */
+    // 4. 채팅 메시지 전송 및 AI 응답 처리
     async function sendChatMessage() {
-        // AI가 이미 생성 중이면 중복 실행 방지
         if (isGenerating) return;
-
         const messageText = messageInput.value.trim();
-        if (messageText === '') return; // 입력 내용이 없으면 무시
-
-        const apiKey = apiKeyInput.value;
-        const model = geminiModelInput.value;
-        if (!apiKey) {
+        if (messageText === '') return;
+        if (!apiKeyInput.value) {
             alert('설정에서 Gemini API 키를 먼저 입력해주세요.');
             return;
         }
 
-        // 1. 사용자 메시지를 화면에 즉시 표시
-        appendBubble(messageText, 'user');
         const userMessage = { role: 'user', content: messageText };
-        fullChatHistory.push(userMessage); // 전체 대화 기록에 추가
-        messageInput.value = ''; // 입력창 비우기
+        fullChatHistory.push(userMessage);
+        appendBubble(userMessage.content, userMessage.role, fullChatHistory.length - 1);
+        updateStoredChatLog(); // 새 메시지 추가 후 저장
+        messageInput.value = '';
         scrollToBottom();
 
-        // 2. AI 응답 생성을 위한 준비
         isGenerating = true;
-        sendBtn.disabled = true; // 전송 버튼 비활성화
-        appendBubble('입력 중...', 'character'); // '입력 중...' 표시
+        sendBtn.disabled = true;
+        const thinkingBubbleIndex = fullChatHistory.length;
+        appendBubble('입력 중...', 'assistant', thinkingBubbleIndex);
         scrollToBottom();
 
-        // 3. AI에게 전달할 데이터 구성
         const contextSize = parseInt(contextSizeInput.value, 10);
-        // contextSize가 0이면 전체 기록, 아니면 최근 N개만 잘라서 '단기 기억'으로 사용
-        const recentHistory = contextSize === 0 ? fullChatHistory : fullChatHistory.slice(-contextSize);
+        const recentHistory = contextSize === 0 ? fullChatHistory : fullChatHistory.slice(-(contextSize + 1), -1); // '입력중' 제외
         
-        // AI의 역할과 대화 스타일을 정의하는 시스템 프롬프트
-        const systemPrompt = `
-            ${userPersonaInput.value}
-            ${userNoteInput.value}
-            위 설정을 바탕으로 대화합니다.
-            이제부터 당신은 상대방과 친근하게 대화하는 친구입니다. 길고 서술적인 답변 대신, 실제 카톡을 하듯이 짧고 간결한 단문 중심으로 대답해주세요.
+        // 3가지 프롬프트를 조합하여 최종 시스템 프롬프트 생성
+        const finalSystemPrompt = `
+[행동 규칙]
+${systemPromptInput.value}
+
+[캐릭터 설정]
+${userPersonaInput.value}
+
+[유저 노트]
+${userNoteInput.value}
+
         `;
         
-        const apiURL = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+        const apiURL = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModelInput.value}:generateContent?key=${apiKeyInput.value}`;
 
-        // 4. Gemini API 호출
         try {
             const response = await fetch(apiURL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    // 시스템 지시사항과 대화 기록을 함께 전달
-                    "system_instruction": { "parts": [{ "text": systemPrompt }] },
-                    "contents": recentHistory.map(msg => ({ // API 형식에 맞게 변환
-                        role: msg.role === 'user' ? 'user' : 'model', // assistant -> model
+                    "system_instruction": { "parts": [{ "text": finalSystemPrompt }] },
+                    "contents": recentHistory.map(msg => ({
+                        role: msg.role === 'user' ? 'user' : 'model',
                         parts: [{ text: msg.content }]
                     }))
                 })
             });
 
-            // '입력 중...' 말풍선 제거
-            chatLogContainer.removeChild(chatLogContainer.lastChild);
+            document.querySelector(`[data-index='${thinkingBubbleIndex}']`).remove();
 
             if (!response.ok) {
                 const errorBody = await response.json();
-                throw new Error(`API 오류: ${errorBody.error.message}`);
+                throw new Error(errorBody.error.message);
             }
 
             const data = await response.json();
             const aiResponseText = data.candidates[0].content.parts[0].text;
             
-            // 5. AI 응답을 화면에 표시
-            appendBubble(aiResponseText, 'assistant');
             const aiMessage = { role: 'assistant', content: aiResponseText };
-            fullChatHistory.push(aiMessage); // 전체 대화 기록에 추가
+            fullChatHistory.push(aiMessage);
+            appendBubble(aiMessage.content, aiMessage.role, fullChatHistory.length - 1);
+            updateStoredChatLog(); // AI 응답 추가 후 저장
 
         } catch (error) {
-            console.error("Gemini API 호출 오류:", error);
-            appendBubble(`오류가 발생했습니다: ${error.message}`, 'character');
+            appendBubble(`API 오류: ${error.message}`, 'character', fullChatHistory.length);
         } finally {
-            // 6. 마무리 작업
             isGenerating = false;
-            sendBtn.disabled = false; // 전송 버튼 다시 활성화
+            sendBtn.disabled = false;
             scrollToBottom();
         }
     }
 
+    // 5. 수정/삭제 모달 관련 함수
+    function showEditModal(index) {
+        currentlyEditingIndex = index;
+        modalTextarea.value = fullChatHistory[index].content;
+        editModal.style.display = 'flex';
+    }
 
-    // --- 5. 이벤트 리스너 및 초기화 ---
+    function hideEditModal() {
+        editModal.style.display = 'none';
+        currentlyEditingIndex = -1;
+    }
+
+    function saveEditedMessage() {
+        if (currentlyEditingIndex > -1) {
+            fullChatHistory[currentlyEditingIndex].content = modalTextarea.value;
+            updateStoredChatLog(); // 수정 후 저장
+            displayChatHistory(); // 전체 화면 다시 그리기
+        }
+        hideEditModal();
+    }
+
+    function deleteMessage() {
+        if (currentlyEditingIndex > -1) {
+            // "정말 삭제하시겠습니까?" 확인창
+            if (confirm("이 메시지를 정말 삭제하시겠습니까?")) {
+                fullChatHistory.splice(currentlyEditingIndex, 1);
+                updateStoredChatLog(); // 삭제 후 저장
+                displayChatHistory(); // 전체 화면 다시 그리기
+            }
+        }
+        hideEditModal();
+    }
+
+
+    // 6. 이벤트 리스너 및 초기화
     appIcons.forEach(icon => icon.addEventListener('click', () => openApp(icon.dataset.app)));
     backButtons.forEach(button => button.addEventListener('click', goHome));
     saveSettingsBtn.addEventListener('click', saveSettings);
     jsonUploadInput.addEventListener('change', handleFileUpload);
     
-    // 채팅 전송 이벤트 리스너 활성화
     sendBtn.addEventListener('click', sendChatMessage);
     messageInput.addEventListener('keydown', (e) => {
-        // Shift + Enter는 줄바꿈, 그냥 Enter는 전송
         if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault(); // 기본 동작(줄바꿈) 방지
+            e.preventDefault();
             sendChatMessage();
         }
     });
+
+    // 말풍선 클릭 시 수정/삭제 모달 띄우기 (이벤트 위임)
+    chatLogContainer.addEventListener('click', (e) => {
+        if (e.target.classList.contains('chat-bubble')) {
+            const index = parseInt(e.target.dataset.index, 10);
+            showEditModal(index);
+        }
+    });
+
+    modalSaveBtn.addEventListener('click', saveEditedMessage);
+    modalDeleteBtn.addEventListener('click', deleteMessage);
+    modalCancelBtn.addEventListener('click', hideEditModal);
 
     loadSettings();
     loadChatLogFromStorage();
