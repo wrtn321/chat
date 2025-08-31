@@ -183,6 +183,7 @@ body {
     margin-bottom: 10px;
     line-height: 1.5;
     word-wrap: break-word;
+    white-space: break-spaces;
 }
 .character {
     background-color: var(--character-bubble);
