@@ -54,7 +54,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function loadSettings() {
         apiKeyInput.value = localStorage.getItem('geminiApiKey') || '';
-        systemPromptInput.value = localStorage.getItem('systemPrompt') || '# Response Rules
+        systemPromptInput.value = localStorage.getItem('systemPrompt') || `# Response Rules
 - 먼저, 제공된 {char}와 {user}의 전체 대화 로그를 정밀하게 분석하여 다음 요소들을 파악: {char}과 {user}의 성격, 고유한 말투, 가치관, 관계 등.
 - 분석한 결과물은 출력할 필요없어.
 - 이전 응답들은 오로지 맥락과 캐릭터 파악에만 사용, 출력 형식은 무조건 짧은 단문 대화 형식.
