@@ -271,3 +271,64 @@ body {
     color: #888;
     margin-top: 20px;
 }
+/* --- 수정/삭제 모달 스타일 --- */
+.modal-overlay {
+    display: none; /* 평소에는 숨김 */
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.6);
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background-color: white;
+    padding: 20px;
+    border-radius: 10px;
+    width: 90%;
+    max-width: 350px; /* 스마트폰 화면에 맞게 */
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+}
+
+.modal-content h3 {
+    margin-bottom: 15px;
+}
+
+#modal-textarea {
+    width: 100%;
+    min-height: 120px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    padding: 10px;
+    font-size: 1em;
+    resize: vertical;
+}
+
+.modal-buttons {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 15px;
+}
+
+.modal-buttons button {
+    padding: 8px 15px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    margin-left: 10px;
+    font-weight: bold;
+}
+
+#modal-save-btn {
+    background-color: #007AFF;
+    color: white;
+}
+
+#modal-delete-btn.danger {
+    background-color: #FF3B30;
+    color: white;
+}
